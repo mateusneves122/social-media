@@ -1,0 +1,33 @@
+# Valida o padrão da mensagem de commit para Microsserviços
+      - name: Validate Commit Messages
+        if: github.event_name == 'pull_request'
+        run: |
+          # Instala o jq para processar o JSON da API do GitHub
+          sudo apt-get install -y jq
+          
+          # REGEX AJUSTADA: Agora o escopo (nome do serviço) é OBRIGATÓRIO
+          # Ex: feat(servico-usuarios): minha feature
+          REGEX="^(feat|feature|bugfix|hotfix|chore|docs|style|refactor|test)\([a-z0-9-]+\): .+"
+          
+          COMMITS_URL="${{ github.event.pull_request.commits_url }}"
+          COMMIT_MESSAGES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "$COMMITS_URL" | jq -r '.[].commit.message')
+          
+          echo "Verificando as seguintes mensagens de commit:"
+          echo "$COMMIT_MESSAGES"
+          
+          while IFS= read -r message; do
+            if [[ ! "$message" =~ $REGEX ]]; then
+              echo "------------------------------------------------"
+              echo "ERRO: A mensagem de commit a seguir é inválida:"
+              echo "'$message'"
+              echo "------------------------------------------------"
+              echo "A mensagem deve seguir o padrão 'tipo(servico): descrição'."
+              echo "O escopo (nome do serviço) entre parênteses é obrigatório."
+              echo "Tipos permitidos: feat, feature, bugfix, hotfix, chore, docs, style, refactor, test."
+              echo "Exemplo válido: feat(servico-usuarios): adicionar endpoint de login"
+              exit 1
+            fi
+          done <<< "$COMMIT_MESSAGES"
+          
+          echo "------------------------------------------------"
+          echo "Todas as mensagens de commit são válidas."
